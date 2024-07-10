@@ -1,0 +1,11 @@
+---
+listen: 127.0.0.1
+listen_port: 8081
+apikey: "abcd1234"
+commands:
+- endpoint: "/testread"
+  read_file: "/tmp/apitest-{x}"
+- endpoint: "/testwrite"
+  write_file: "/tmp/apitest-{x}"
+- endpoint: "/testshell"
+  shell: 'echo Hello "x={x} y={y}"'
