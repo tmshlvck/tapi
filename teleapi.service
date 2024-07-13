@@ -1,0 +1,11 @@
+[Unit]
+Description=teleapi systemd service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/teleapi -c /etc/teleapi.yml
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
