@@ -11,7 +11,9 @@ Simple HTTP RPC server that can:
 
 ## Example usage
 
-* `teleapi.yaml`
+* build `cargo build --release`
+* copy to system `sudo cp target/release/teleapi /usr/local/bin/`
+* create `/etc/teleapi.yaml`:
 
 ```
 ---
@@ -27,7 +29,13 @@ commands:
   shell: 'echo Hello "x={x} y={y}"'
 ```
 
-* run server: `rust run -- -c teleapi.yml` or `teleapi -c teleapi.yml`
+* copy systemd service: `sudo cp teleapi.service /etc/systemd/system/teleapi.service`
+* enable the systemd service:
+```
+systemctl daemon-reload
+systemctl enable teleapi
+systemctl restart teleapi
+```
 
 * call `POST /testwrite` with `x=5`:
 
