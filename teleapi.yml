@@ -7,5 +7,10 @@ commands:
   read_file: "/tmp/apitest-{x}"
 - endpoint: "/testwrite"
   write_file: "/tmp/apitest-{x}"
+- endpoint: "/testwrite"
+  write_file: "/root/apipermtest-{x}"
+  user: knot
+  group: knot
+  mode: 0o644
 - endpoint: "/testshell"
   shell: 'echo Hello "x={x} y={y}"'

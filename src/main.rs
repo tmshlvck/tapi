@@ -15,8 +15,9 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 use rouille::{Request, Response, ResponseBody};
-
 use std::io::Read;
+use std::os::unix::fs::PermissionsExt;
+use nix::unistd::{Uid, Gid, chown};
 use std::fs::File;
 use clap::Parser;
 use serde_derive::{Serialize, Deserialize};
@@ -28,6 +29,9 @@ struct Command {
     read_file: Option<String>,
     read_bin_file: Option<String>,
     write_file: Option<String>,
+    user: Option<String>,
+    group: Option<String>,
+    mode: Option<u32>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -50,6 +54,15 @@ impl CommandResult {
         CommandResult {retcode: out.status.code().unwrap_or(0),
             stdout: String::from_utf8(out.stdout).unwrap_or(String::new()),
             stderr: String::from_utf8(out.stderr).unwrap_or(String::new()) }
+    }
+}
+
+fn empty_with_status(code: u16) -> Response {
+    Response {
+        status_code: code,
+        headers: vec![],
+        data: ResponseBody::empty(),
+        upgrade: None,
     }
 }
 
@@ -81,21 +94,97 @@ fn read_file(filename: &str) -> Response {
     }
 }
 
-fn write_file(filename: &str, request: &Request) -> Response {
-    let mut rdata = request.data().unwrap();
+fn write_file(cmd: &Command, request: &Request) -> Response{
+    let cmdfn = cmd.write_file.clone().expect("File name to write is missing in command configration");
+    let filename = expand_vars(&cmdfn, request);
+    let mut rdata = match request.data() {
+        Some(data) => data,
+        None => {
+            println!("write_file {} failed due to no data read from HTTP request.", filename);
+            return empty_with_status(500);
+        }
+    };
     let mut sdata = String::new();
-    rdata.read_to_string(&mut sdata).unwrap();
-    let res = std::fs::write(filename, sdata);
-    match res {
+    match rdata.read_to_string(&mut sdata) {
+        Ok(_) => {},
+        Err(err) => {
+            println!("write_file {} failed to extract data from HTTP request: {}", filename, err);
+            return empty_with_status(500);
+        }
+    }
+
+    match std::fs::write(&filename, sdata) {
         Ok(_) => {
-            println!("write_file {} success", filename);
-            empty_with_status(201)
+            println!("write_file {} success", filename);         
         },
         Err(err) => {
             println!("write_file {} failed: {}", filename, err);
-            empty_with_status(500)
+            return empty_with_status(500);
         }
     }
+
+    match cmd.mode {
+        Some(some_mode) => {
+            let mut perms = match std::fs::metadata(&filename){
+                Ok(md) => md.permissions(),
+                Err(err) => {
+                    println!("write_file {} failed to get metadata: {}", filename, err);
+                    return empty_with_status(500);
+                }
+            };
+            perms.set_mode(some_mode);
+            match std::fs::set_permissions(&filename, perms) {
+                Ok(_) => (),
+                Err(err) => {
+                    println!("write_file {} failed to set metadata: {}", filename, err);
+                    return empty_with_status(500);
+                }
+            }
+        },
+        None => ()
+    }
+
+    match &cmd.user {
+        Some(some_user) => {
+            let uid = match users::get_user_by_name(some_user) {
+                Some(u) => u.uid(),
+                None => {
+                    println!("write_file {} failed: user {} not found", filename, some_user);
+                    return empty_with_status(500);
+                }
+            };
+            match chown(filename.as_str(), Some(Uid::from_raw(uid)), None) {
+                Ok(_) => (),
+                Err(err) => {
+                    println!("write_file {} failed to set uid: {}", filename, err);
+                    return empty_with_status(500);
+                }
+            };
+        },
+        None => ()
+    }
+
+    match &cmd.group {
+        Some(some_group) => {
+            let gid = match users::get_group_by_name(some_group) {
+                Some(g) => g.gid(),
+                None => {
+                    println!("write_file {} failed: group {} not found", filename, some_group);
+                    return empty_with_status(500);
+                }
+            };
+            match chown(filename.as_str(), None, Some(Gid::from_raw(gid))) {
+                Ok(_) => (),
+                Err(err) => {
+                    println!("write_file {} failed to set gid: {}", filename, err);
+                    return empty_with_status(500);
+                }
+            };
+        },
+        None => ()
+    }
+
+    empty_with_status(201)
 }
 
 fn shell(cmd: &str, request: &Request) -> Response {
@@ -118,15 +207,6 @@ fn shell(cmd: &str, request: &Request) -> Response {
     }
 }
 
-fn empty_with_status(code: u16) -> Response {
-    Response {
-        status_code: code,
-        headers: vec![],
-        data: ResponseBody::empty(),
-        upgrade: None,
-    }
-}
-
 fn expand_vars(input: &str, request: &Request) -> String {
     let maybestart = input.find('{');
     let maybeend = input.find('}');
@@ -138,10 +218,10 @@ fn expand_vars(input: &str, request: &Request) -> String {
                     let out = input[..start].to_string() + &p + &input[end+1..];
                     return expand_vars(&out, request);
                 }
-                _ => {}
+                _ => ()
             };
         },
-        _ => {}
+        _ => ()
     }
 
     String::from(input)
@@ -153,9 +233,8 @@ fn execute(cmd: &Command, request: &Request) -> Response {
     match method {
         "POST" | "PUT" => {
             match &cmd.write_file {
-                Some(filename) => {
-                    let expfn = expand_vars(filename, request);
-                    return write_file(&expfn, request);
+                Some(_) => {
+                    return write_file(cmd, request);
                 },
                 None => ()
             }
@@ -174,16 +253,16 @@ fn execute(cmd: &Command, request: &Request) -> Response {
         "GET" => {
             match &cmd.read_bin_file {
                 Some(filename) => {
-                    let expfn = expand_vars(filename, request);
-                    return read_bin_file(&expfn);
+                    let expfilename = expand_vars(filename, request);
+                    return read_bin_file(&expfilename);
                 },
                 None => ()
             }
 
             match &cmd.read_file {
                 Some(filename) => {
-                    let expfn = expand_vars(filename, request);
-                    return read_file(&expfn);
+                    let expfilename = expand_vars(filename, request);
+                    return read_file(&expfilename);
                 },
                 None => ()
             }
@@ -248,8 +327,8 @@ struct Args {
 fn main(){
     let args = Args::parse();
 
-    let cf = std::fs::File::open(args.config).unwrap();
-    let conf: Config = serde_yaml::from_reader(cf).unwrap();
+    let cf = std::fs::File::open(args.config).expect("Unable to open configuration file.");
+    let conf: Config = serde_yaml::from_reader(cf).expect("Failed to parse configuration file.");
 
     println!("Starting server on {}:{}", conf.listen, conf.listen_port);
 

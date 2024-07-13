@@ -5,7 +5,9 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.8", features = ["derive"] }
+nix = { version = "0.29.0", features = ["dir", "user"] }
 rouille = "3.6.2"
 serde = "1.0.203"
 serde_derive = "1.0.203"
 serde_yaml = "0.9.34"
+users = "0.11.0"
