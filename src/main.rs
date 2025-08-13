@@ -294,7 +294,7 @@ fn execute(cmd: &Command, request: &Request) -> Response {
 fn check_auth(request: &Request, conf: &Config) -> bool {
     for h in request.headers() {
         let (k,v) = h;
-        if k == "Authorization" && v == conf.apikey {
+        if k == "Authorization" && (v == conf.apikey || v == format!("Bearer {}", conf.apikey)) {
             return true;
         }
     }
