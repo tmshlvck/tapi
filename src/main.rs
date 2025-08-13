@@ -1,5 +1,5 @@
 /*
-TeleAPI
+TAPI
 
 Copyright (C) 2024 Tomas Hlavacek (tmshlvck@gmail.com)
 
@@ -320,7 +320,7 @@ fn handle_http_request(request: &Request, conf: &Config) -> Response {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    #[arg(short, long, default_value_t = String::from("teleapi.yml"))]
+    #[arg(short, long, default_value_t = String::from("tapi.yml"))]
     config: String,
 }
 

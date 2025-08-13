@@ -1,10 +1,10 @@
 [Unit]
-Description=teleapi systemd service
+Description=tapi systemd service
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/teleapi -c /etc/teleapi.yml
+ExecStart=/usr/local/bin/tapi -c /etc/tapi.yml
 Restart=always
 
 [Install]

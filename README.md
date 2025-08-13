@@ -1,4 +1,4 @@
-# TeleAPI
+# TAPI
 
 Simple HTTP RPC server that can:
 
@@ -12,8 +12,8 @@ Simple HTTP RPC server that can:
 ## Example usage
 
 * build `cargo build --release`
-* copy to system `sudo cp target/release/teleapi /usr/local/bin/`
-* create `/etc/teleapi.yaml`:
+* copy to system `sudo cp target/release/tapi /usr/local/bin/`
+* create `/etc/tapi.yaml`:
 
 ```
 ---
@@ -29,12 +29,12 @@ commands:
   shell: 'echo Hello "x={x} y={y}"'
 ```
 
-* copy systemd service: `sudo cp teleapi.service /etc/systemd/system/teleapi.service`
+* copy systemd service: `sudo cp tapi.service /etc/systemd/system/tapi.service`
 * enable the systemd service:
 ```
 systemctl daemon-reload
-systemctl enable teleapi
-systemctl restart teleapi
+systemctl enable tapi
+systemctl restart tapi
 ```
 
 * call `POST /testwrite` with `x=5`:
