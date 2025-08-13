@@ -14,3 +14,20 @@ commands:
   mode: 0o644
 - endpoint: "/testshell"
   shell: 'echo Hello "x={x} y={y}"'
+
+- endpoint: "/zonewrite"
+  write_file: "/tmp/{zonename}.zone"
+  user: th
+  group: th
+  mode: 0o644
+- endpoint: "/configwrite"
+  write_file: "/tmp/knot-ddnsm.conf"
+  user: th
+  group: th
+  mode: 0o644
+- endpoint: "/zonereload"
+  shell: "/usr/bin/true {zonename}"
+- endpoint: "/zonecheck"
+  shell: "/usr/bin/true {zonename}"
+- endpoint: "/configreload"
+  shell: "/usr/bin/true"
